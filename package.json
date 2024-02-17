@@ -1,0 +1,13 @@
+{
+  "name": "chat",
+  "version": "1.0.0",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve"
+  },
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "serve": "11.2.0"
+  }
+}
