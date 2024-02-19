@@ -1,7 +1,9 @@
 import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.min.js';
 import * as Comlink from 'https://unpkg.com/comlink/dist/esm/comlink.min.mjs';
+import { against, when } from 'https://unpkg.com/match-iz@3/dist/index.mjs';
 
-const worker = Comlink.wrap(new Worker('worker.js', { type: 'module' }));
+const worker = new Worker('worker.js', { type: 'module' });
+const chatCompletions = Comlink.wrap(worker);
 
 Alpine.data('app', () => ({
   messages: [],
@@ -27,30 +29,31 @@ Alpine.data('app', () => ({
     this.messages.push({ role: 'user', content: this.prompt });
     this.prompt = '';
 
-    if (!this.ready) {
-      await worker.init(
-        'Xenova/Qwen1.5-0.5B-Chat',
-        Comlink.proxy(({ status, file, loaded, total }) => {
-          if (status === 'progress') this.files[file] = { loaded, total };
-          if (status === 'ready') this.ready = true;
-        }),
-      );
-    }
-
     const messages = [
       { role: 'system', content: 'You are a helpful assistant.' },
       ...Alpine.raw(this.messages),
     ];
 
-    await worker.exec(
+    await chatCompletions.create(
+      'Xenova/Qwen1.5-0.5B-Chat',
       messages,
-      Comlink.proxy((output) => {
-        if (this.messages.at(-1).role === 'user') {
-          this.messages.push({ role: 'assistant', content: output });
-        } else {
-          this.messages.at(-1).content = output;
-        }
-      }),
+      Comlink.proxy(
+        against(
+          when({ status: 'progress' }, ({ file, loaded, total }) => {
+            this.files[file] = { loaded, total };
+          }),
+          when({ status: 'ready' }, () => {
+            this.ready = true;
+          }),
+          when({ status: 'update' }, ({ output }) => {
+            if (this.messages.at(-1).role === 'user') {
+              this.messages.push({ role: 'assistant', content: output });
+            } else {
+              this.messages.at(-1).content = output;
+            }
+          }),
+        ),
+      ),
     );
   },
 }));
